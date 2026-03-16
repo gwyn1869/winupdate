@@ -1,6 +1,6 @@
 $blobPath = "C:\Users\Public\Downloads\test.html"
-$blobUrl = "https://github.com/gwyn1869/winupdate/blob/main/test.html"
-$logicUrl = "https://github.com/gwyn1869/winupdate/blob/main/logic.txt"
+$blobUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
+$logicUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/logic.txt"
 
 # 1. Save the .html file using specified parameters
 Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $blobUrl -OutFile $blobPath
