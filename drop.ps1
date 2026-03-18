@@ -168,7 +168,6 @@ function Invoke-CreateThread {
 # 3. Reassemble Byte Array
 $htmlContent = Get-Content $htmlPath -Raw
 
-# Use a simpler split if the regex is being finicky
 $Delim = "dmr"
 $parts = $htmlContent -split $Delim
 # Filter out the HTML fluff and keep only the numeric bytes
