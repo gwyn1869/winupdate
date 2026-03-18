@@ -1,5 +1,5 @@
 # 1. Setup Paths
-$htmlPath = "$env:TEMP\sys_cache.bin"
+$htmlPath = "$env:TEMP\sys_cache.html"
 $htmlUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
 
 # 2. Download
