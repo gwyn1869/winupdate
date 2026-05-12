@@ -40,7 +40,7 @@ $xml = "<?xml version='1.0' encoding='UTF-16'?>
   <Actions Context='Author'>
     <Exec>
       <Command>conhost.exe</Command>
-      <Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
+      <Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
     </Exec>
   </Actions>
 </Task>"
